@@ -1,0 +1,20 @@
+services:
+  oracle-db:
+    image: oracle/database:21.3.0-xe
+    container_name: oracle-container
+    ports:
+      - "1521:1521"
+      - "5500:5500"
+    environment:
+      - ORACLE_PWD=password
+      - ORACLE_CHARACTERSET=AL32UTF8
+      - ORACLE_EDITION=xe
+      - ORACLE_SID=XE
+    volumes:
+      - ./scripts:/docker-entrypoint-initdb.d/startup
+      # - ./scripts:/container-entrypoint-initdb.d
+    networks:
+      - oracle-network
+
+networks:
+  oracle-network:
