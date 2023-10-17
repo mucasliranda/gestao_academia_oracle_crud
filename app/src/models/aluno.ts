@@ -126,6 +126,27 @@ export class Aluno {
   }
 
   static async removerAluno() {
+    const connection = await oracledb.getConnection();
+
+    const result = await connection.execute(`
+      SELECT
+        A.MATRICULA,
+        A.NOME,
+        A.CPF,
+        A.EMAIL,
+        A.TELEFONE,
+        A.DATA_NASCIMENTO,
+        A.CONDICAO_MATRICULA,
+        A.INSTRUTOR,
+        I.NOME AS NOME_INSTRUTOR
+      FROM
+        ALUNO A
+      INNER JOIN 
+        INSTRUTOR I ON I.MATRICULA = A.INSTRUTOR
+    `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+    printTables(result.rows)
+
     const properties = {
       matricula: {
         description: 'Matricula',
@@ -135,28 +156,16 @@ export class Aluno {
       }
     }
 
-    console.log('a')
-
     const { matricula } = await prompt.get({properties});
-
-    console.log('b')
-
-    const connection = await oracledb.getConnection();
-
-    console.log('c')
 
     const sql = `
       DELETE FROM ALUNO WHERE MATRICULA = :matricula
     `;
 
-    console.log('d')
-
     try {
-      console.log('e')
-
       const result = await connection.execute(sql, [matricula]);
 
-      console.log('f')
+      await connection.commit();
   
       console.log(result)
 
@@ -271,6 +280,8 @@ export class Aluno {
       try {
         const result = await connection.execute(sql, [nome, cpf, email, telefone, dataNascimento, instrutor, matricula], { autoCommit: true });
     
+        await connection.commit();
+
         console.log('Aluno atualizado com sucesso!');
       } catch (err) {
         console.log('Erro ao atualizar aluno');

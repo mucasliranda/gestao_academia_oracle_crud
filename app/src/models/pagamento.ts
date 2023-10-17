@@ -43,7 +43,7 @@ export class Pagamento {
         MATRICULA,
         DATA_PAGAMENTO
       ) VALUES (
-        SYSTEM.PAGAMENTO_ID_SEQ.NEXTVAL,
+        C##LABDATABASE.PAGAMENTO_ID_SEQ.NEXTVAL,
         :matricula,
         TO_DATE(:data, 'YYYY/MM/DD')
       )
@@ -52,10 +52,14 @@ export class Pagamento {
     try {
       await connection.execute(sql, [matricula, data.toString().split('/').reverse().join('-')])
 
+      await connection.commit();
+
+      console.log('Pagamento inserido com sucesso!');
+
       const { opcao } = await prompt.get({
         properties: {
           opcao: {
-            description: 'Deseja inserir outro aluno? (s/n)',
+            description: 'Deseja inserir outro pagamento? (s/n)',
             pattern: /^[sn]$/,
             message: 'Opção inválida',
             required: true
@@ -73,6 +77,12 @@ export class Pagamento {
   }
 
   static async removerPagamento() {
+    const connection = await oracledb.getConnection();
+
+    const result = await connection.execute('SELECT * FROM PAGAMENTO', [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+    printTables(result.rows)
+    
     const properties = {
       id: {
         description: 'ID',
@@ -84,8 +94,6 @@ export class Pagamento {
 
     const { id } = await prompt.get({ properties });
 
-    const connection = await oracledb.getConnection();
-
     const sql = `
       DELETE FROM PAGAMENTO
       WHERE ID = :id
@@ -93,6 +101,8 @@ export class Pagamento {
 
     try {
       await connection.execute(sql, [id]);
+
+      await connection.commit();
 
       console.log('Pagamento removido com sucesso!');
     } catch (error) {
@@ -162,6 +172,8 @@ export class Pagamento {
 
       try {
         await connection.execute(sql, [matricula, data.toString().split('/').reverse().join('-'), id]);
+
+        await connection.commit();
 
         console.log('Pagamento atualizado com sucesso!');
       } catch (error) {

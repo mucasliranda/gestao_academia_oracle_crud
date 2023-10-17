@@ -12,7 +12,6 @@ services:
       - ORACLE_SID=XE
     volumes:
       - ./scripts:/docker-entrypoint-initdb.d/startup
-      # - ./scripts:/container-entrypoint-initdb.d
     networks:
       - oracle-network
 

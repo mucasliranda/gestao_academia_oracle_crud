@@ -2,7 +2,7 @@
 
 
 export function printTables(arr: any) {
-  console.log('\n')
+  console.log('\n--------------------------------\n')
 
   arr.forEach((each: any) => {
     Object.entries(each).forEach(([key, value]) => {

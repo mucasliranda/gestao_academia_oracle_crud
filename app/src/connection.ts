@@ -6,8 +6,8 @@ export async function initDB() {
     // Create a connection pool which will later be accessed via the
     // pool cache as the 'default' pool.
     await oracledb.createPool({
-      user: 'SYSTEM',
-      password: 'password',
+      user: 'C##LABDATABASE',
+      password: 'password123',
       connectionString: 'localhost:1521/xe',
       // connectString: dbConfig.connectString,
       // edition: 'ORA$BASE', // used for Edition Based Redefintion

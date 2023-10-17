@@ -8,7 +8,16 @@ export class Instrutor {
   static async getInstrutores() {
     const connection = await oracledb.getConnection();
 
-    const sql = 'SELECT * FROM INSTRUTOR';
+    const sql = `
+      SELECT
+        MATRICULA,
+        NOME
+        CPF,
+        EMAIL,
+        TELEFONE
+      FROM 
+        INSTRUTOR
+    `;
 
     const result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
 
@@ -72,7 +81,7 @@ export class Instrutor {
       }
     }
 
-    const { nome, cpf, email, telefone, alunos } = await prompt.get({properties});
+    const { nome, cpf, email, telefone, alunos } = await prompt.get({ properties });
 
     const connection = await oracledb.getConnection();
 
@@ -84,7 +93,7 @@ export class Instrutor {
         EMAIL,
         TELEFONE
       ) VALUES (
-        INSTRUTOR_SEQ.NEXTVAL,
+        C##LABDATABASE.INSTRUTOR_SEQ.NEXTVAL,
         :nome,
         :cpf,
         :email,
@@ -95,7 +104,9 @@ export class Instrutor {
 
     try {
       await connection.execute(sql, [nome, cpf, email, telefone]);
-  
+
+      await connection.commit();
+
       console.log('Instrutor inserido com sucesso!');
 
       const { opcao } = await prompt.get({
@@ -109,7 +120,7 @@ export class Instrutor {
         }
       });
 
-      if(opcao === 'n') {
+      if (opcao === 'n') {
         return;
       }
     } catch (error) {
@@ -117,8 +128,23 @@ export class Instrutor {
       console.log(error);
     }
   }
-  
+
   static async removerInstrutor() {
+    const connection = await oracledb.getConnection();
+
+    const result = await connection.execute(`
+      SELECT
+        MATRICULA,
+        NOME
+        CPF,
+        EMAIL,
+        TELEFONE
+      FROM 
+        INSTRUTOR
+    `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+    printTables(result.rows)
+
     const properties = {
       matricula: {
         description: 'Matricula',
@@ -128,9 +154,7 @@ export class Instrutor {
       }
     }
 
-    const { matricula } = await prompt.get({properties});
-
-    const connection = await oracledb.getConnection();
+    const { matricula } = await prompt.get({ properties });
 
     const sql = `
       DELETE FROM INSTRUTOR
@@ -157,13 +181,15 @@ export class Instrutor {
       }
     });
 
-    if(opcao === 'n') {
+    if (opcao === 'n') {
       return;
     }
 
     try {
       await connection.execute(sql, [matricula]);
-  
+
+      await connection.commit();
+
       console.log('Instrutor removido com sucesso!');
     } catch (error) {
       console.log('Erro ao remover instrutor');
@@ -182,10 +208,10 @@ export class Instrutor {
     }
 
     while (true) {
-      const { matricula } = await prompt.get({properties});
-  
+      const { matricula } = await prompt.get({ properties });
+
       const connection = await oracledb.getConnection();
-  
+
       const instrutor = await connection.execute(`
         SELECT * FROM INSTRUTOR WHERE MATRICULA = :matricula
       `, [matricula], { outFormat: oracledb.OUT_FORMAT_OBJECT });
@@ -232,7 +258,7 @@ export class Instrutor {
 
       console.log('Deixe em branco para manter o valor atual.')
 
-      const { nome, cpf, email, telefone } = await prompt.get({properties: properties2});
+      const { nome, cpf, email, telefone } = await prompt.get({ properties: properties2 });
 
       const sql = `
         UPDATE INSTRUTOR SET
@@ -245,7 +271,9 @@ export class Instrutor {
 
       try {
         await connection.execute(sql, [nome, cpf, email, telefone, matricula]);
-    
+
+        await connection.commit();
+
         console.log('Instrutor atualizado com sucesso!');
       } catch (error) {
         console.log('Erro ao atualizar instrutor');
@@ -263,7 +291,7 @@ export class Instrutor {
         }
       });
 
-      if(opcao === 'n') {
+      if (opcao === 'n') {
         return;
       }
     }
