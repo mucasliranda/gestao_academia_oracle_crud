@@ -88,7 +88,7 @@ export class Aluno {
           INSTRUTOR,
           CONDICAO_MATRICULA
         ) VALUES (
-          SYSTEM.ALUNO_MATRICULA_SEQ.NEXTVAL,
+          C##LABDATABASE.ALUNO_MATRICULA_SEQ.NEXTVAL,
           :nome,
           :cpf,
           :email,

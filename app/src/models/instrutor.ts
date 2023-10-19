@@ -93,7 +93,7 @@ export class Instrutor {
         EMAIL,
         TELEFONE
       ) VALUES (
-        C##LABDATABASE.INSTRUTOR_SEQ.NEXTVAL,
+        C##LABDATABASE.INSTRUTOR_MATRICULA_SEQ.NEXTVAL,
         :nome,
         :cpf,
         :email,
