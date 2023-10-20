@@ -33,3 +33,5 @@ git clone https://github.com/seu-usuario/sua-aplicacao.git
       npm install
       npm run dev
       ```
+
+[Video demonstrativo](https://www.youtube.com/watch?v=T4QRx8X4xSk&ab_channel=LucasMiranda)
