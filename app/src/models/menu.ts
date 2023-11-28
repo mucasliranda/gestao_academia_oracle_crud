@@ -2,10 +2,11 @@ import prompt from "prompt";
 import { Aluno } from "./aluno";
 import { Instrutor } from "./instrutor";
 import { Pagamento } from "./pagamento";
+import { MongoClient } from "../mongo";
 
 
 
-
+const mongoClient = new MongoClient();
 
 export default class Menu {
   static _opcoes = {
@@ -25,7 +26,8 @@ export default class Menu {
         required: true
       }
     }
-    this.intro();
+    
+    await this.intro();
 
     while(true) {
       this.displayMenu();
@@ -191,20 +193,29 @@ export default class Menu {
     }
   }
 
-  static intro() {
+  static async intro() {
+    await mongoClient.connect();
 
+    const alunos = (await mongoClient.db.collection("aluno").countDocuments()).toString().padStart(2, '0')
+    const instrutores = (await mongoClient.db.collection("instrutor").countDocuments()).toString().padStart(2, '0')
+    const pagamentos = (await mongoClient.db.collection("pagamento").countDocuments()).toString().padStart(2, '0')
+
+    console.log("\n")
     console.log("#####################################")
     console.log("#   SISTEMA DE GESTÃO DE ACADEMIA   #")
     console.log("#                                   #")
     console.log("#                                   #")
     console.log("#   TOTAL DE REGISTROS EXISTENTES   #")
-    console.log("#                                   #")
+    console.log(`#      1 - ALUNOS: ${alunos}               #`)
+    console.log(`#      2 - INSTRUTORES: ${instrutores}          #`)
+    console.log(`#      3 - PAGAMENTO: ${pagamentos}            #`)
     console.log("#                                   #")
     console.log("#                                   #")
     console.log("#   CRIADO POR: LUCAS MIRANDA       #")
     console.log("#               ARTHUR BLANDINO     #")
     console.log("#               TIAGO CARCANHOLO    #")
     console.log("#               MATHEUS PASSOS      #")
+    console.log("#                                   #")
     console.log("#                                   #")
     console.log("#   DISCIPLINA: BANCO DE DADOS      #")
     console.log("#               2023/2              #")

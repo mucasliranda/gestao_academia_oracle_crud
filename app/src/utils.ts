@@ -19,3 +19,10 @@ export function printTables(arr: any) {
 
   })
 }
+
+export function excludeId(arr: any[]) {
+  return arr.map(each => {
+    const { _id, ...rest } = each
+    return rest
+  })
+}

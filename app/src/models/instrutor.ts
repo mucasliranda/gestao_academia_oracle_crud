@@ -1,54 +1,46 @@
 import oracledb from 'oracledb';
 import prompt from 'prompt';
-import { printTables } from '../utils';
+import { excludeId, printTables } from '../utils';
+import { MongoClient } from '../mongo';
 
 
+
+const mongoClient = new MongoClient();
 
 export class Instrutor {
   static async getInstrutores() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const sql = `
-      SELECT
-        MATRICULA,
-        NOME
-        CPF,
-        EMAIL,
-        TELEFONE
-      FROM 
-        INSTRUTOR
-    `;
+    const rows = excludeId(await mongoClient.db.collection('instrutor').find({}).toArray());
 
-    const result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-    const rows = result.rows;
+    await mongoClient.close();
 
     printTables(rows)
   }
 
   static async getQuantidadeAlunosPorInstrutores() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const sql = `
-      SELECT 
-        I.NOME,
-        COUNT(A.INSTRUTOR) AS ALUNOS
-      FROM 
-        INSTRUTOR I
-      INNER JOIN 
-        ALUNO A ON I.MATRICULA = A.INSTRUTOR
-      GROUP BY 
-        I.NOME
-      ORDER BY 
-        ALUNOS DESC
-    `;
+    const rows = excludeId(await mongoClient.db.collection('instrutor').aggregate([
+      {
+        $lookup: {
+          from: 'aluno',
+          localField: 'MATRICULA',
+          foreignField: 'INSTRUTOR',
+          as: 'ALUNOS'
+        }
+      },
+      {
+        $project: {
+          NOME: 1,
+          ALUNOS: {
+            $size: '$ALUNOS'
+          }
+        }
+      }
+    ]).toArray());
 
-    const result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-    const rows = result.rows as {
-      NOME: string;
-      ALUNOS: number;
-    }[];
+    await mongoClient.close();
 
     printTables(rows)
   }
@@ -83,29 +75,17 @@ export class Instrutor {
 
     const { nome, cpf, email, telefone, alunos } = await prompt.get({ properties });
 
-    const connection = await oracledb.getConnection();
-
-    const sql = `
-      INSERT INTO INSTRUTOR (
-        MATRICULA,
-        NOME,
-        CPF,
-        EMAIL,
-        TELEFONE
-      ) VALUES (
-        C##LABDATABASE.INSTRUTOR_MATRICULA_SEQ.NEXTVAL,
-        :nome,
-        :cpf,
-        :email,
-        :telefone
-      )
-    `;
-
-
     try {
-      await connection.execute(sql, [nome, cpf, email, telefone]);
+      await mongoClient.connect();
 
-      await connection.commit();
+      await mongoClient.db.collection('instrutor').insertOne({
+        NOME: nome,
+        CPF: cpf,
+        EMAIL: email,
+        TELEFONE: telefone
+      });
+
+      await mongoClient.close();
 
       console.log('Instrutor inserido com sucesso!');
 
@@ -130,20 +110,11 @@ export class Instrutor {
   }
 
   static async removerInstrutor() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const result = await connection.execute(`
-      SELECT
-        MATRICULA,
-        NOME
-        CPF,
-        EMAIL,
-        TELEFONE
-      FROM 
-        INSTRUTOR
-    `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+    const result = excludeId(await mongoClient.db.collection('instrutor').find({}).toArray());
 
-    printTables(result.rows)
+    printTables(result)
 
     const properties = {
       matricula: {
@@ -156,16 +127,9 @@ export class Instrutor {
 
     const { matricula } = await prompt.get({ properties });
 
-    const sql = `
-      DELETE FROM INSTRUTOR
-      WHERE MATRICULA = :matricula
-    `;
+    const existInstrutor = (await mongoClient.db.collection('instrutor').findOne({ MATRICULA: matricula }));
 
-    const instrutor = await connection.execute(`
-      SELECT * FROM INSTRUTOR WHERE MATRICULA = :matricula
-    `, [matricula], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-    if (instrutor.rows == undefined || instrutor.rows.length === 0) {
+    if (!existInstrutor) {
       console.log('Instrutor não encontrado')
       return;
     }
@@ -186,9 +150,9 @@ export class Instrutor {
     }
 
     try {
-      await connection.execute(sql, [matricula]);
+      await mongoClient.db.collection('instrutor').deleteOne({ MATRICULA: matricula });
 
-      await connection.commit();
+      await mongoClient.close();
 
       console.log('Instrutor removido com sucesso!');
     } catch (error) {
@@ -210,13 +174,11 @@ export class Instrutor {
     while (true) {
       const { matricula } = await prompt.get({ properties });
 
-      const connection = await oracledb.getConnection();
+      await mongoClient.connect();
 
-      const instrutor = await connection.execute(`
-        SELECT * FROM INSTRUTOR WHERE MATRICULA = :matricula
-      `, [matricula], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+      const instrutor = await mongoClient.db.collection('instrutor').findOne({ MATRICULA: matricula });
 
-      if (instrutor.rows == undefined || instrutor.rows.length === 0) {
+      if (!instrutor) {
         console.log('Instrutor não encontrado')
         return;
       }
@@ -228,7 +190,7 @@ export class Instrutor {
           message: 'Nome inválido',
           required: false,
           // @ts-ignore
-          default: instrutor.rows[0].NOME
+          default: instrutor.NOME
         },
         cpf: {
           description: 'CPF',
@@ -236,7 +198,7 @@ export class Instrutor {
           message: 'CPF inválido',
           required: false,
           // @ts-ignore
-          default: instrutor.rows[0].CPF
+          default: instrutor.CPF
         },
         email: {
           description: 'Email',
@@ -244,7 +206,7 @@ export class Instrutor {
           message: 'Email inválido',
           required: false,
           // @ts-ignore
-          default: instrutor.rows[0].EMAIL
+          default: instrutor.EMAIL
         },
         telefone: {
           description: 'Telefone (ddd + número)',
@@ -252,7 +214,7 @@ export class Instrutor {
           message: 'Telefone inválido',
           required: false,
           // @ts-ignore
-          default: instrutor.rows[0].TELEFONE
+          default: instrutor.TELEFONE
         }
       }
 
@@ -260,19 +222,17 @@ export class Instrutor {
 
       const { nome, cpf, email, telefone } = await prompt.get({ properties: properties2 });
 
-      const sql = `
-        UPDATE INSTRUTOR SET
-          NOME = :nome,
-          CPF = :cpf,
-          EMAIL = :email,
-          TELEFONE = :telefone
-        WHERE MATRICULA = :matricula
-      `;
-
       try {
-        await connection.execute(sql, [nome, cpf, email, telefone, matricula]);
+        await mongoClient.db.collection('instrutor').updateOne({ MATRICULA: matricula }, {
+          $set: {
+            NOME: nome,
+            CPF: cpf,
+            EMAIL: email,
+            TELEFONE: telefone
+          }
+        });
 
-        await connection.commit();
+        await mongoClient.close();
 
         console.log('Instrutor atualizado com sucesso!');
       } catch (error) {

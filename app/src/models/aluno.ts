@@ -1,33 +1,19 @@
 import oracledb from 'oracledb';
 import prompt from 'prompt';
-import { printTables } from '../utils';
+import { excludeId, printTables } from '../utils';
+import { MongoClient } from '../mongo';
 
 
+
+const mongoClient = new MongoClient();
 
 export class Aluno {
   static async getAlunos() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const sql = `
-      SELECT
-        A.MATRICULA,
-        A.NOME,
-        A.CPF,
-        A.EMAIL,
-        A.TELEFONE,
-        A.DATA_NASCIMENTO,
-        A.CONDICAO_MATRICULA,
-        A.INSTRUTOR,
-        I.NOME AS NOME_INSTRUTOR
-      FROM
-        ALUNO A
-      INNER JOIN 
-        INSTRUTOR I ON I.MATRICULA = A.INSTRUTOR
-    `;
+    const rows = excludeId(await mongoClient.db.collection('aluno').find({}).toArray());
 
-    const result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-    const rows = result.rows;
+    await mongoClient.close();
 
     printTables(rows)
   }
@@ -75,33 +61,22 @@ export class Aluno {
     while(true) {
       const { nome, cpf, email, telefone, dataNascimento, instrutor } = await prompt.get({properties});
       
-      const connection = await oracledb.getConnection();
-
-      const sql = `
-        INSERT INTO ALUNO (
-          MATRICULA,
-          NOME,
-          CPF,
-          EMAIL,
-          TELEFONE,
-          DATA_NASCIMENTO,
-          INSTRUTOR,
-          CONDICAO_MATRICULA
-        ) VALUES (
-          C##LABDATABASE.ALUNO_MATRICULA_SEQ.NEXTVAL,
-          :nome,
-          :cpf,
-          :email,
-          :telefone,
-          TO_DATE(:dataNascimento, 'DD/MM/YYYY'),
-          :instrutor,
-          1
-        )
-      `;
-
       try {
-        const result = await connection.execute(sql, [nome, cpf, email, telefone, dataNascimento, instrutor], { autoCommit: true });
-  
+        await mongoClient.connect();
+
+        console.log(`vou inserir ${dataNascimento.toString()}`)
+
+        await mongoClient.db.collection('aluno').insertOne({
+          nome,
+          cpf,
+          email,
+          telefone,
+          dataNascimento: new Date(dataNascimento.toString().split('/').reverse().join('-')),
+          instrutor
+        });
+
+        await mongoClient.close();
+
         console.log('Aluno inserido com sucesso!');
   
         const { opcao } = await prompt.get({
@@ -126,26 +101,11 @@ export class Aluno {
   }
 
   static async removerAluno() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const result = await connection.execute(`
-      SELECT
-        A.MATRICULA,
-        A.NOME,
-        A.CPF,
-        A.EMAIL,
-        A.TELEFONE,
-        A.DATA_NASCIMENTO,
-        A.CONDICAO_MATRICULA,
-        A.INSTRUTOR,
-        I.NOME AS NOME_INSTRUTOR
-      FROM
-        ALUNO A
-      INNER JOIN 
-        INSTRUTOR I ON I.MATRICULA = A.INSTRUTOR
-    `, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+    const result = excludeId(await mongoClient.db.collection('aluno').find({}).toArray());
 
-    printTables(result.rows)
+    printTables(result)
 
     const properties = {
       matricula: {
@@ -158,16 +118,10 @@ export class Aluno {
 
     const { matricula } = await prompt.get({properties});
 
-    const sql = `
-      DELETE FROM ALUNO WHERE MATRICULA = :matricula
-    `;
-
     try {
-      const result = await connection.execute(sql, [matricula]);
+      await mongoClient.db.collection('aluno').deleteOne({ MATRICULA: matricula });
 
-      await connection.commit();
-  
-      console.log(result)
+      await mongoClient.close();
 
       console.log('Aluno removido com sucesso!');
     } catch (err) {
@@ -189,24 +143,11 @@ export class Aluno {
     while (true) {
       const { matricula } = await prompt.get({properties});
 
-      const connection = await oracledb.getConnection();
+      await mongoClient.connect();
   
-      const aluno = await connection.execute(`
-        SELECT
-          MATRICULA,
-          NOME,
-          CPF,
-          EMAIL,
-          TELEFONE,
-          DATA_NASCIMENTO,
-          INSTRUTOR
-        FROM
-          ALUNO
-        WHERE
-          MATRICULA = :matricula
-      `, [matricula], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-  
-      if (aluno.rows == undefined || aluno.rows.length === 0) {
+      const aluno = await mongoClient.db.collection('aluno').findOne({ MATRICULA: matricula });
+
+      if (!aluno) {
         console.log('Aluno não encontrado')
         return;
       }
@@ -218,7 +159,7 @@ export class Aluno {
           message: 'Nome inválido',
           required: false,
           // @ts-ignore
-          default: aluno.rows[0].NOME
+          default: aluno.NOME
         },
         cpf: {
           description: 'CPF',
@@ -226,7 +167,7 @@ export class Aluno {
           message: 'CPF inválido',
           required: false,
           // @ts-ignore
-          default: aluno.rows[0].CPF
+          default: aluno.CPF
         },
         email: {
           description: 'Email',
@@ -234,7 +175,7 @@ export class Aluno {
           message: 'Email inválido',
           required: false,
           // @ts-ignore
-          default: aluno.rows[0].EMAIL
+          default: aluno.EMAIL
         },
         telefone: {
           description: 'Telefone (ddd + número)',
@@ -242,7 +183,7 @@ export class Aluno {
           message: 'Telefone inválido',
           required: false,
           // @ts-ignore
-          default: aluno.rows[0].TELEFONE
+          default: aluno.TELEFONE
         },
         dataNascimento: {
           description: 'Data de nascimento (dd/mm/aaaa))',
@@ -250,7 +191,7 @@ export class Aluno {
           message: 'Data de nascimento inválida',
           required: false,
           // @ts-ignore
-          default: new Date(aluno.rows[0].DATA_NASCIMENTO).toLocaleDateString()
+          default: new Date(aluno.DATA_NASCIMENTO).toLocaleDateString()
         },
         instrutor: {
           description: 'Matricula do instrutor',
@@ -258,7 +199,7 @@ export class Aluno {
           message: 'Matricula do instrutor inválida',
           required: false,
           // @ts-ignore
-          default: aluno.rows[0].INSTRUTOR
+          default: aluno.INSTRUTOR
         }
       }
   
@@ -266,21 +207,19 @@ export class Aluno {
   
       const { nome, cpf, email, telefone, dataNascimento, instrutor } = await prompt.get({properties: properties2});
   
-      const sql = `
-        UPDATE ALUNO SET
-          NOME = :nome,
-          CPF = :cpf,
-          EMAIL = :email,
-          TELEFONE = :telefone,
-          DATA_NASCIMENTO = TO_DATE(:dataNascimento, 'DD/MM/YYYY'),
-          INSTRUTOR = :instrutor
-        WHERE MATRICULA = :matricula
-      `;
-  
       try {
-        const result = await connection.execute(sql, [nome, cpf, email, telefone, dataNascimento, instrutor, matricula], { autoCommit: true });
-    
-        await connection.commit();
+        await mongoClient.db.collection('aluno').updateOne({ MATRICULA: matricula }, {
+          $set: {
+            NOME: nome,
+            CPF: cpf,
+            EMAIL: email,
+            TELEFONE: telefone,
+            DATA_NASCIMENTO: new Date(dataNascimento.toString().split('/').reverse().join('-')),
+            INSTRUTOR: instrutor
+          }
+        });
+
+        await mongoClient.close();
 
         console.log('Aluno atualizado com sucesso!');
       } catch (err) {

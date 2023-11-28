@@ -1,18 +1,19 @@
 import oracledb from "oracledb";
 import prompt from "prompt";
-import { printTables } from "../utils";
+import { excludeId, printTables } from "../utils";
+import { MongoClient } from "../mongo";
 
 
+
+const mongoClient = new MongoClient();
 
 export class Pagamento {
   static async getPagamentos() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const sql = 'SELECT * FROM PAGAMENTO';
+    const rows = excludeId(await mongoClient.db.collection('pagamento').find({}).toArray());
 
-    const result = await connection.execute(sql, [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
-
-    const rows = result.rows;
+    await mongoClient.close();
 
     printTables(rows)
   }
@@ -35,24 +36,15 @@ export class Pagamento {
 
     const { matricula, data } = await prompt.get({ properties });
 
-    const connection = await oracledb.getConnection();
-
-    const sql = `
-      INSERT INTO PAGAMENTO (
-        ID,
-        MATRICULA,
-        DATA_PAGAMENTO
-      ) VALUES (
-        C##LABDATABASE.PAGAMENTO_ID_SEQ.NEXTVAL,
-        :matricula,
-        TO_DATE(:data, 'YYYY/MM/DD')
-      )
-    `;
-
     try {
-      await connection.execute(sql, [matricula, data.toString().split('/').reverse().join('-')])
+      await mongoClient.connect();
 
-      await connection.commit();
+      await mongoClient.db.collection('pagamento').insertOne({
+        MATRICULA: matricula,
+        DATA_PAGAMENTO: data.toString().split('/').reverse().join('-')
+      });
+
+      await mongoClient.close();
 
       console.log('Pagamento inserido com sucesso!');
 
@@ -77,11 +69,11 @@ export class Pagamento {
   }
 
   static async removerPagamento() {
-    const connection = await oracledb.getConnection();
+    await mongoClient.connect();
 
-    const result = await connection.execute('SELECT * FROM PAGAMENTO', [], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+    const result = excludeId(await mongoClient.db.collection('pagamento').find({}).toArray());
 
-    printTables(result.rows)
+    printTables(result)
     
     const properties = {
       id: {
@@ -94,15 +86,10 @@ export class Pagamento {
 
     const { id } = await prompt.get({ properties });
 
-    const sql = `
-      DELETE FROM PAGAMENTO
-      WHERE ID = :id
-    `;
-
     try {
-      await connection.execute(sql, [id]);
+      await mongoClient.db.collection('pagamento').deleteOne({ ID: id });
 
-      await connection.commit();
+      await mongoClient.close();
 
       console.log('Pagamento removido com sucesso!');
     } catch (error) {
@@ -124,18 +111,20 @@ export class Pagamento {
     while (true) {
       const { id } = await prompt.get({ properties });
 
-      const connection = await oracledb.getConnection();
+      await mongoClient.connect();
 
-      const pagamento = await connection.execute(`
-        SELECT
-          ID,
-          MATRICULA,
-          DATA_PAGAMENTO
-        FROM PAGAMENTO WHERE ID = :id
-      `, [id], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+      // const pagamento = await connection.execute(`
+      //   SELECT
+      //     ID,
+      //     MATRICULA,
+      //     DATA_PAGAMENTO
+      //   FROM PAGAMENTO WHERE ID = :id
+      // `, [id], { outFormat: oracledb.OUT_FORMAT_OBJECT });
+
+      const pagamento = await mongoClient.db.collection('pagamento').findOne({ ID: id });
 
       // @ts-ignore
-      if (pagamento.rows.length === 0) {
+      if (!pagamento) {
         console.log('Pagamento não encontrado');
         return;
       }
@@ -147,7 +136,7 @@ export class Pagamento {
           message: 'Matricula inválida',
           required: false,
           // @ts-ignore
-          default: pagamento.rows[0].MATRICULA
+          default: pagamento.MATRICULA
         },
         data: {
           description: 'Data de pagamento (dd/mm/aaaa))',
@@ -155,7 +144,7 @@ export class Pagamento {
           message: 'Data de pagamento inválida',
           required: false,
           // @ts-ignore
-          default: new Date(pagamento.rows[0].DATA_PAGAMENTO).toLocaleDateString()
+          default: new Date(pagamento.DATA_PAGAMENTO).toLocaleDateString()
         },
       }
 
@@ -163,17 +152,13 @@ export class Pagamento {
 
       const { matricula, data } = await prompt.get({ properties: properties2 });
 
-      const sql = `
-        UPDATE PAGAMENTO SET
-          MATRICULA = :matricula,
-          DATA_PAGAMENTO = TO_DATE(:data, 'YYYY/MM/DD')
-        WHERE ID = :id
-      `;
-
       try {
-        await connection.execute(sql, [matricula, data.toString().split('/').reverse().join('-'), id]);
+        await mongoClient.db.collection('pagamento').updateOne({ ID: id }, {
+          MATRICULA: matricula,
+          DATA_PAGAMENTO: data.toString().split('/').reverse().join('-')
+        });
 
-        await connection.commit();
+        await mongoClient.close();
 
         console.log('Pagamento atualizado com sucesso!');
       } catch (error) {

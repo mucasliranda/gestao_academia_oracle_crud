@@ -1,7 +1,7 @@
 import oracledb from 'oracledb';
 
 
-export async function initDB() {
+export async function initOracleDB() {
   try {
     // Create a connection pool which will later be accessed via the
     // pool cache as the 'default' pool.
